@@ -28,7 +28,14 @@ class LREModel:
             self.model(**inputs)
             
         # Extract vector: [Batch, Seq, Hidden] -> [Hidden]
-        h = ret[layer_name].output[0][0, subj_end_idx, :].detach().cpu().numpy()
+        # Handle both tuple output (e.g., GPT-2) and tensor output (e.g., Qwen)
+        output = ret[layer_name].output
+        if isinstance(output, tuple):
+            # Output is a tuple, extract the first element
+            h = output[0][0, subj_end_idx, :].detach().cpu().numpy()
+        else:
+            # Output is already a tensor
+            h = output[0, subj_end_idx, :].detach().cpu().numpy()
         return h
 
     def train_lre(self, training_data, layer_name, template):
@@ -50,7 +57,13 @@ class LREModel:
             # 2. Get the "Ideal" direction. 
             # In the original paper, they map s -> z (final layer output).
             # We approximate this by looking at the embedding of the target object.
-            target_id = self.tokenizer.encode(" " + sample['object'])[0]
+            # Handle models that add special tokens (like Gemma's <bos>)
+            encoded = self.tokenizer.encode(" " + sample['object'], add_special_tokens=False)
+            if len(encoded) == 0:
+                # Fallback: try without leading space
+                encoded = self.tokenizer.encode(sample['object'], add_special_tokens=False)
+            target_id = encoded[0]
+            
             # Get the weight of the output embedding for the target token
             # This represents the direction in the final space corresponding to the answer
             target_vec = self.model.lm_head.weight[target_id].detach().cpu().numpy()
