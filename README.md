@@ -1,10 +1,18 @@
 # LRE Experiment - Linear Relational Embeddings
 
-A Python implementation exploring **Linear Relational Embeddings (LRE)** using transformer language models to analyze how models encode relational knowledge. This experiment specifically examines gender bias stereotypes in academic fields and professions.
+A Python implementation exploring **Linear Relational Embeddings (LRE)** using transformer language models to analyze how models encode relational knowledge. This experiment specifically examines gender bias stereotypes in academic fields and professions across multiple model architectures.
 
 ## Overview
 
-This project implements the Linear Relational Embedding technique to understand how transformer models (GPT-2-XL) internally represent relationships between concepts. The experiment:
+This project implements the Linear Relational Embedding technique to understand how transformer models internally represent relationships between concepts. The experiment includes implementations for:
+
+- **GPT-2** (124M parameters)
+- **GPT-2-XL** (1.5B parameters)
+- **Llama 3.2** (1B parameters)
+- **Qwen 2.5** (0.6B parameters)
+- **Gemma 2** (2.6B parameters)
+
+Each implementation:
 
 1. **Extracts hidden states** from specific transformer layers when processing subject prompts
 2. **Trains a linear regression** to map subject representations to their associated outputs
@@ -27,7 +35,7 @@ This lets us test whether the model's reasoning about relationships is fundament
 
 ## Dataset
 
-The experiment uses `data_sample.json` containing 38 academic fields/professions paired with gendered associations (based on stereotypical model predictions):
+The experiment uses `data/data_sample.json` containing 38 academic fields/professions paired with gendered associations (based on stereotypical model predictions):
 
 ```json
 {
@@ -36,7 +44,7 @@ The experiment uses `data_sample.json` containing 38 academic fields/professions
 }
 ```
 
-**Note:** This dataset examines *biases in the model's outputs*, not factual or normative statements about fields.
+**Note:** This dataset examines *biases in the model's outputs*, not factual or normative statements about fields. The data is split 60/40 for training and testing across all experiments.
 
 ## Requirements
 
@@ -74,24 +82,47 @@ pip install git+https://github.com/davidbau/baukit.git
 
 ## Usage
 
-### Running the Jupyter Notebook (Recommended)
+### Running the Jupyter Notebooks (Recommended)
 
-The easiest way to explore the experiment is through the interactive notebook:
+The project includes multiple experiment notebooks for different models. Choose the model you want to explore:
 
 ```bash
 # Using uv
-uv run jupyter notebook demo.ipynb
+uv run jupyter notebook
 
 # Or with standard jupyter
-jupyter notebook demo.ipynb
+jupyter notebook
 ```
 
-The notebook walks through:
-1. Loading the data
-2. Splitting into train/test sets
-3. Initializing the LRE model
-4. Training the linear relation estimator
-5. Evaluating faithfulness on test data
+Available experiment notebooks:
+
+1. **`lre-experiment-gpt2-xl.ipynb`** - GPT-2-XL (1.5B parameters, 48 layers)
+   - Tests multiple layers: early (layer 5), middle (layer 15), and late (layer 35)
+   - Recommended starting point for most users
+
+2. **`lre-experiment-gpt2.ipynb`** - GPT-2 (124M parameters, 12 layers)
+   - Faster and lighter weight
+   - Good for testing on limited hardware
+
+3. **`lre-experiment-llama-3.2-1b.ipynb`** - Llama 3.2 (1B parameters)
+   - Modern architecture comparison
+
+4. **`lre-experiment-qwen3-0.6b.ipynb`** - Qwen 2.5 (0.6B parameters)
+   - Efficient model for quick experiments
+
+5. **`lre-experiment-gemma3-270m.ipynb`** - Gemma 2 (2.6B parameters)
+   - Larger model for more capable representations
+
+6. **`model-layer-inspect.ipynb`** - Utility notebook
+   - Inspect layer names and architecture of any transformer model
+   - Useful for configuring experiments with new models
+
+Each notebook walks through:
+1. Loading and splitting the dataset (60/40 train/test)
+2. Initializing the model
+3. Training LRE operators at different layers
+4. Evaluating faithfulness on test data
+5. Comparing layer performance
 
 ### Running Programmatically
 
@@ -100,14 +131,18 @@ You can also use the `LREModel` class directly in your own scripts:
 ```python
 from lre import LREModel
 import json
+import random
 
 # Load data
-with open("data_sample.json", "r") as f:
+with open("data/data_sample.json", "r") as f:
     data = json.load(f)
 
-# Split data
-train_data = data[:25]
-test_data = data[25:]
+# Split data (60/40 train/test)
+random.seed(42)
+random.shuffle(data)
+split_idx = int(len(data) * 0.6)
+train_data = data[:split_idx]
+test_data = data[split_idx:]
 
 # Initialize model
 lre = LREModel(model_name="gpt2-xl", device="mps")  # Use "cpu" or "cuda" as needed
@@ -140,13 +175,20 @@ lre = LREModel(model_name="gpt2-xl", device="cpu")
 
 ```
 LRE-Experiment/
-├── lre.py              # Main LREModel class implementation
-├── demo.ipynb          # Interactive Jupyter notebook demo
-├── data_sample.json    # Dataset of field → gender associations
-├── pyproject.toml      # Project dependencies and metadata
-├── uv.lock            # Locked dependency versions
-├── .python-version    # Python version specification
-└── README.md          # This file
+├── lre/                                    # LRE package
+│   ├── __init__.py                        # Package initialization
+│   └── lre.py                             # Main LREModel class implementation
+├── data/
+│   └── data_sample.json                   # Dataset of field → gender associations
+├── lre-experiment-gpt2.ipynb              # GPT-2 (124M) experiment notebook
+├── lre-experiment-gpt2-xl.ipynb           # GPT-2-XL (1.5B) experiment notebook
+├── lre-experiment-llama-3.2-1b.ipynb      # Llama 3.2 (1B) experiment notebook
+├── lre-experiment-qwen3-0.6b.ipynb        # Qwen 2.5 (0.6B) experiment notebook
+├── lre-experiment-gemma3-270m.ipynb       # Gemma 2 (2.6B) experiment notebook
+├── model-layer-inspect.ipynb              # Tool for inspecting model architectures
+├── pyproject.toml                         # Project dependencies and metadata
+├── uv.lock                                # Locked dependency versions
+└── README.md                              # This file
 ```
 
 ## How It Works
