@@ -65,7 +65,12 @@ class LREModel:
         correct = 0
         total = 0
         
-        print("\n--- Evaluation ---")
+        print("\n" + "="*80)
+        print(f"{'EVALUATION RESULTS':^80}")
+        print("="*80)
+        print(f"{'Subject':<25} {'Expected':<15} {'LRE Prediction':<15} {'Status':>10}")
+        print("-"*80)
+        
         for sample in test_data:
             subj = sample['subject']
             expected = sample['object']
@@ -87,9 +92,12 @@ class LREModel:
             predicted_word = self.tokenizer.decode(top_token_id).strip()
 
             is_match = predicted_word.lower().startswith(expected.lower())
-            print(f"Subject: {subj:<20} | Expected: {expected:<10} | LRE Pred: {predicted_word:<10} | {'✓' if is_match else '✗'}")
+            status = '✓ Correct' if is_match else '✗ Wrong'
+            print(f"{subj:<25} {expected:<15} {predicted_word:<15} {status:>10}")
             
             if is_match: correct += 1
             total += 1
-            
-        print(f"\Faithfulness: {correct}/{total} ({correct/total:.2%})")
+        
+        print("="*80)
+        print(f"{'Faithfulness Score:':<40} {correct}/{total} ({correct/total:.2%})")
+        print("="*80)
