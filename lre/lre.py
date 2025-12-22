@@ -21,8 +21,15 @@ class LREModel:
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
         
         # Find where the subject ends in the tokenized sequence
-        # (Simplified logic: taking the last token of the input for this demo)
-        subj_end_idx = inputs["input_ids"].shape[1] - 1
+        # Tokenize the subject separately to find its length
+        subj_tokens = self.tokenizer.encode(subject, add_special_tokens=False)
+        # The subject ends at position len(subj_tokens) - 1 (accounting for any prefix tokens)
+        subj_end_idx = len(subj_tokens) - 1
+        
+        # Adjust for models that add special tokens at the start (like <bos>)
+        full_tokens = inputs["input_ids"][0].tolist()
+        if len(full_tokens) > 0 and full_tokens[0] in [self.tokenizer.bos_token_id, self.tokenizer.cls_token_id]:
+            subj_end_idx += 1
 
         with TraceDict(self.model, [layer_name]) as ret:
             self.model(**inputs)
@@ -94,7 +101,8 @@ class LREModel:
             
             # 2. Apply Linear Transformation (LRE)
             # z_pred = W * h + b
-            z_pred = torch.tensor(lre_operator.predict([h])[0]).to(self.device)
+            z_pred = lre_operator.predict([h])[0]  # Returns numpy array
+            z_pred = torch.tensor(z_pred, dtype=torch.float32).to(self.device)
 
             # 3. Decode directly from this predicted vector (Rank 1 approximation)
             # We treat z_pred as if it were the final layer state entering the unembedding
@@ -114,3 +122,9 @@ class LREModel:
         print("="*80)
         print(f"{'Faithfulness Score:':<40} {correct}/{total} ({correct/total:.2%})")
         print("="*80)
+        
+        return {
+            'faithfulness': correct / total if total > 0 else 0,
+            'correct': correct,
+            'total': total
+        }
