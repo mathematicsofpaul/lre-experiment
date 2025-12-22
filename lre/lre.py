@@ -14,22 +14,16 @@ class LREModel:
         # GPT-2/J specific tokenization configs
         self.tokenizer.pad_token = self.tokenizer.eos_token
         
-    def get_hidden_state(self, text, layer_name, subject):
+    def get_hidden_state(self, text, layer_name):
         """
-        Runs the model and extracts the hidden state at the last token of the subject.
+        Runs the model and extracts the hidden state at the last token of the prompt.
+        This is where the model is about to predict the answer.
         """
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
         
-        # Find where the subject ends in the tokenized sequence
-        # Tokenize the subject separately to find its length
-        subj_tokens = self.tokenizer.encode(subject, add_special_tokens=False)
-        # The subject ends at position len(subj_tokens) - 1 (accounting for any prefix tokens)
-        subj_end_idx = len(subj_tokens) - 1
-        
-        # Adjust for models that add special tokens at the start (like <bos>)
-        full_tokens = inputs["input_ids"][0].tolist()
-        if len(full_tokens) > 0 and full_tokens[0] in [self.tokenizer.bos_token_id, self.tokenizer.cls_token_id]:
-            subj_end_idx += 1
+        # Extract from the last token of the entire prompt
+        # This is where the model computes the next token prediction
+        last_token_idx = inputs["input_ids"].shape[1] - 1
 
         with TraceDict(self.model, [layer_name]) as ret:
             self.model(**inputs)
@@ -39,10 +33,10 @@ class LREModel:
         output = ret[layer_name].output
         if isinstance(output, tuple):
             # Output is a tuple, extract the first element
-            h = output[0][0, subj_end_idx, :].detach().cpu().numpy()
+            h = output[0][0, last_token_idx, :].detach().cpu().numpy()
         else:
             # Output is already a tensor
-            h = output[0, subj_end_idx, :].detach().cpu().numpy()
+            h = output[0, last_token_idx, :].detach().cpu().numpy()
         return h
 
     def train_lre(self, training_data, layer_name, template):
@@ -58,7 +52,7 @@ class LREModel:
             prompt = template.format(subj)
             
             # 1. Get Input State (s) at the specific layer
-            h_s = self.get_hidden_state(prompt, layer_name, subj)
+            h_s = self.get_hidden_state(prompt, layer_name)
             X.append(h_s)
 
             # 2. Get the "Ideal" direction. 
@@ -81,13 +75,22 @@ class LREModel:
         reg = LinearRegression().fit(X, Y)
         return reg
 
-    def evaluate(self, lre_operator, test_data, layer_name, template):
+    def evaluate(self, lre_operator, test_data, layer_name, template, verbose=True):
         correct = 0
         total = 0
         
         print("\n" + "="*80)
         print(f"{'EVALUATION RESULTS':^80}")
         print("="*80)
+        
+        # Show sample prompt if verbose
+        if verbose and len(test_data) > 0:
+            sample_prompt = template.format(test_data[0]['subject'])
+            print(f"\nSample prompt structure (first test item):")
+            print(f"{'─'*80}")
+            print(f"{sample_prompt}")
+            print(f"{'─'*80}\n")
+        
         print(f"{'Subject':<25} {'Expected':<15} {'LRE Prediction':<15} {'Status':>10}")
         print("-"*80)
         
@@ -97,7 +100,7 @@ class LREModel:
             prompt = template.format(subj)
 
             # 1. Get current hidden state
-            h = self.get_hidden_state(prompt, layer_name, subj)
+            h = self.get_hidden_state(prompt, layer_name)
             
             # 2. Apply Linear Transformation (LRE)
             # z_pred = W * h + b
