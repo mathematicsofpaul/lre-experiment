@@ -4,11 +4,11 @@ from baukit import TraceDict
 from sklearn.linear_model import LinearRegression
 
 class LREModel:
-    def __init__(self, model_name="gpt2-xl", device="cpu"):
+    def __init__(self, model_name="gpt2-xl", device="cpu", token=None):
         print(f"Loading {model_name} on {device}...")
         self.device = device
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name).to(device)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, token=token)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name, token=token).to(device)
         self.model.eval()
         
         # GPT-2/J specific tokenization configs
