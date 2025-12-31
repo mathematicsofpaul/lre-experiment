@@ -120,7 +120,19 @@ class LREModel:
             print(f"{subj:<25} {expected:<15} {predicted_word:<15} {status:>10}")
             
             if is_match: correct += 1
-            total += 1
+            total += 1 
+
+            # Store prediction details for analysis
+            if not hasattr(self, '_eval_results'):
+                self._eval_results = []
+            self._eval_results.append({
+                'subject': subj,
+                'expected': expected,
+                'predicted': predicted_word,
+                'z_pred': z_pred.detach().cpu().numpy(),
+                'top_token_id': top_token_id,
+                'status': status
+            })
         
         print("="*80)
         print(f"{'Faithfulness Score:':<40} {correct}/{total} ({correct/total:.2%})")
@@ -129,5 +141,6 @@ class LREModel:
         return {
             'faithfulness': correct / total if total > 0 else 0,
             'correct': correct,
-            'total': total
+            'total': total, 
+            'eval_results': getattr(self, '_eval_results', [])
         }
