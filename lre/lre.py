@@ -79,6 +79,9 @@ class LREModel:
         correct = 0
         total = 0
         
+        # Reset eval_results for this evaluation
+        self._eval_results = []
+        
         print("\n" + "="*80)
         print(f"{'EVALUATION RESULTS':^80}")
         print("="*80)
@@ -123,8 +126,6 @@ class LREModel:
             total += 1 
 
             # Store prediction details for analysis
-            if not hasattr(self, '_eval_results'):
-                self._eval_results = []
             self._eval_results.append({
                 'subject': subj,
                 'expected': expected,
