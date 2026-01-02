@@ -2,13 +2,21 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from baukit import TraceDict
 from sklearn.linear_model import LinearRegression
+import os
+
+# Ensure progress bars are shown during model downloads
+os.environ['HF_HUB_DISABLE_PROGRESS_BARS'] = '0'
 
 class LREModel:
     def __init__(self, model_name="gpt2-xl", device="cpu", token=None):
         print(f"Loading {model_name} on {device}...")
         self.device = device
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, token=token)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name, token=token).to(device)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name, 
+            token=token,
+            local_files_only=False  # Allow downloads and show progress
+        ).to(device)
         self.model.eval()
         
         # GPT-2/J specific tokenization configs
@@ -46,7 +54,6 @@ class LREModel:
         X = [] # Subject hidden states (inputs)
         Y = [] # Object target outputs (we will approximate the next token logits)
 
-        print("Extracting training representations...")
         for sample in training_data:
             subj = sample['subject']
             prompt = template.format(subj)
@@ -71,7 +78,6 @@ class LREModel:
             Y.append(target_vec)
 
         # Solve for Linear mapping: Y = XW + b
-        print("Solving Linear Regression...")
         reg = LinearRegression().fit(X, Y)
         return reg
 
