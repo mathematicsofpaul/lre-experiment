@@ -486,3 +486,97 @@ def run_layer_experiment(lre_model, train_data, test_data, layers_to_test, templ
         'layer_numbers': layer_numbers,
         'faithfulness_values': faithfulness_values
     }
+
+
+def plot_operator_eigenvalue_spectrum(operator, title="Operator Eigenvalue Spectrum"):
+    """
+    Plot the eigenvalue spectrum of an operator's coefficient matrix.
+    
+    Parameters:
+    -----------
+    operator : LinearRegression
+        The trained linear regression operator
+    title : str
+        Title for the plot
+        
+    Returns:
+    --------
+    eigenvalues_sorted : numpy array
+        Sorted eigenvalues in descending order by magnitude
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
+    # Compute eigenvalues
+    eigenvalues = np.linalg.eigvals(operator.coef_)
+    eigenvalues_sorted = np.sort(np.abs(eigenvalues))[::-1]
+    
+    # Create figure with subplots
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    
+    # Plot 1: All eigenvalues (log scale)
+    ax1 = axes[0, 0]
+    ax1.plot(eigenvalues_sorted, 'o-', color='steelblue', markersize=3, linewidth=1)
+    ax1.set_yscale('log')
+    ax1.set_xlabel('Index', fontsize=11)
+    ax1.set_ylabel('Eigenvalue Magnitude (log scale)', fontsize=11)
+    ax1.set_title('All Eigenvalues', fontsize=12, fontweight='bold')
+    ax1.grid(alpha=0.3)
+    
+    # Plot 2: Top 50 eigenvalues
+    ax2 = axes[0, 1]
+    top_50 = eigenvalues_sorted[:min(50, len(eigenvalues_sorted))]
+    ax2.bar(range(len(top_50)), top_50, color='coral', alpha=0.8)
+    ax2.set_xlabel('Index', fontsize=11)
+    ax2.set_ylabel('Eigenvalue Magnitude', fontsize=11)
+    ax2.set_title(f'Top {len(top_50)} Eigenvalues', fontsize=12, fontweight='bold')
+    ax2.grid(alpha=0.3, axis='y')
+    
+    # Plot 3: Cumulative energy
+    ax3 = axes[1, 0]
+    total_energy = np.sum(eigenvalues_sorted**2)
+    cumulative_energy = np.cumsum(eigenvalues_sorted**2) / total_energy
+    ax3.plot(cumulative_energy, linewidth=2, color='green')
+    ax3.axhline(y=0.9, color='red', linestyle='--', alpha=0.5, label='90% energy')
+    ax3.axhline(y=0.95, color='orange', linestyle='--', alpha=0.5, label='95% energy')
+    ax3.set_xlabel('Number of Eigenvalues', fontsize=11)
+    ax3.set_ylabel('Cumulative Energy Ratio', fontsize=11)
+    ax3.set_title('Cumulative Energy Explained', fontsize=12, fontweight='bold')
+    ax3.legend(fontsize=10)
+    ax3.grid(alpha=0.3)
+    
+    # Plot 4: Ratio of consecutive eigenvalues
+    ax4 = axes[1, 1]
+    if len(eigenvalues_sorted) > 1:
+        eigenvalue_ratios = eigenvalues_sorted[:-1] / eigenvalues_sorted[1:]
+        plot_range = min(100, len(eigenvalue_ratios))
+        ax4.plot(eigenvalue_ratios[:plot_range], 'o-', color='purple', markersize=3, linewidth=1)
+        ax4.set_xlabel('Index', fontsize=11)
+        ax4.set_ylabel('λ_i / λ_{i+1}', fontsize=11)
+        ax4.set_title(f'Ratio of Consecutive Eigenvalues (First {plot_range})', fontsize=12, fontweight='bold')
+        ax4.grid(alpha=0.3)
+    
+    plt.suptitle(title, fontsize=14, fontweight='bold', y=1.00)
+    plt.tight_layout()
+    plt.show()
+    
+    # Print statistics
+    print(f"\n{'='*60}")
+    print("EIGENVALUE SPECTRUM STATISTICS")
+    print(f"{'='*60}")
+    print(f"Total number of eigenvalues: {len(eigenvalues_sorted)}")
+    print(f"Largest eigenvalue: {eigenvalues_sorted[0]:.6e}")
+    print(f"Smallest eigenvalue: {eigenvalues_sorted[-1]:.6e}")
+    print(f"Condition number: {eigenvalues_sorted[0] / eigenvalues_sorted[-1]:.6e}")
+    
+    print(f"\nTop 10 eigenvalues:")
+    for i in range(min(10, len(eigenvalues_sorted))):
+        print(f"  λ_{i+1}: {eigenvalues_sorted[i]:.6e}")
+    
+    # Effective rank
+    effective_rank_90 = np.argmax(cumulative_energy >= 0.90) + 1
+    effective_rank_95 = np.argmax(cumulative_energy >= 0.95) + 1
+    print(f"\nEffective rank (90% energy): {effective_rank_90}")
+    print(f"Effective rank (95% energy): {effective_rank_95}")
+    
+    return eigenvalues_sorted
