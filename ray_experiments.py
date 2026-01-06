@@ -66,7 +66,10 @@ class LREExperimentWorker:
             configure_template_and_print_summary,
             initialize_lre_model,
             get_layers_to_test,
-            run_layer_experiment
+            run_layer_experiment,
+            plot_operator_eigenvalue_spectrum,
+            plot_operator_svd_analysis,
+            plot_pca_predictions
         )
         
         print(f"\n{'='*80}")

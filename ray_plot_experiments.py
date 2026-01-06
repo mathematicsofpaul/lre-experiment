@@ -58,8 +58,10 @@ class LREPlotExperimentWorker:
             configure_template_and_print_summary,
             initialize_lre_model,
             get_layers_to_test,
-            train_layer_with_loo,
-            plot_operator_eigenvalue_spectrum
+            run_layer_experiment,
+            plot_operator_eigenvalue_spectrum,
+            plot_operator_svd_analysis,
+            plot_pca_predictions
         )
         from transformers import AutoConfig
         
@@ -91,37 +93,37 @@ class LREPlotExperimentWorker:
                 
             model_type = config.model_type if hasattr(config, 'model_type') else "unknown"
             
-            # Determine layer naming pattern
-            if model_type in ['gpt2', 'gpt_neo', 'gpt_neox']:
-                layer_pattern = "transformer.h"
-            elif model_type in ['llama', 'mistral', 'qwen2']:
-                layer_pattern = "model.layers"
-            else:
-                layer_pattern = "model.layers"
+            # Determine layers to test
+            model_info = {
+                model_name: {
+                    'num_layers': num_layers,
+                    'model_type': model_type
+                }
+            }
             
-            start = layers_config.get('start_offset', 3)
-            end = num_layers - layers_config.get('end_offset', 3)
-            step = layers_config.get('step', 1)
+            layers_to_test = get_layers_to_test(
+                model_name,
+                model_info=model_info,
+                start_offset=layers_config.get('start_offset', 3),
+                end_offset=layers_config.get('end_offset', 3),
+                step=layers_config.get('step', 1)
+            )
             
-            layers_to_test = [f"{layer_pattern}.{i}" for i in range(start, end + 1, step)]
+            # Run layer-by-layer experiment using utility function
+            experiment_results = run_layer_experiment(
+                lre_model=lre,
+                train_data=train_data,
+                test_data=test_data,
+                layers_to_test=layers_to_test,
+                template=template,
+                visualize=False  # Don't visualize in distributed mode
+            )
             
-            # Run layer-by-layer experiment
-            print(f"\nTesting layers: {layers_to_test}")
-            
-            results = {}
-            faithfulness_scores = {}
-            
-            for layer in layers_to_test:
-                print(f"\n--- Testing Layer: {layer} ---")
-                operator, faithfulness = train_layer_with_loo(
-                    lre, train_data, test_data, layer, template
-                )
-                results[layer] = operator
-                faithfulness_scores[layer] = faithfulness
-            
-            # Find best layer
-            best_layer = max(faithfulness_scores, key=faithfulness_scores.get)
-            best_faithfulness = faithfulness_scores[best_layer]
+            # Extract results
+            results = experiment_results['results']
+            faithfulness_scores = experiment_results['faithfulness_scores']
+            best_layer = experiment_results['best_layer']
+            best_faithfulness = experiment_results['best_faithfulness']
             best_operator = results[best_layer]
             
             print(f"\nBest Layer: {best_layer}")
@@ -152,63 +154,26 @@ class LREPlotExperimentWorker:
             
             print(f"Saved layer plot: {layer_plot_path}")
             
-            # Plot 2: Eigenvalue spectrum for best operator
-            eigenvalues = np.linalg.eigvals(best_operator.coef_)
-            eigenvalues_sorted = np.sort(np.abs(eigenvalues))[::-1]
+            # Plot 2: Eigenvalue spectrum using utility function
+            # Temporarily redirect plot to save to file
+            import matplotlib
+            matplotlib.use('Agg')
             
-            fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-            
-            # Subplot 1: All eigenvalues (log scale)
-            ax1 = axes[0, 0]
-            ax1.plot(eigenvalues_sorted, 'o-', color='steelblue', markersize=3, linewidth=1)
-            ax1.set_yscale('log')
-            ax1.set_xlabel('Index', fontsize=11)
-            ax1.set_ylabel('Eigenvalue Magnitude (log)', fontsize=11)
-            ax1.set_title('All Eigenvalues', fontsize=12, fontweight='bold')
-            ax1.grid(alpha=0.3)
-            
-            # Subplot 2: Top 50 eigenvalues
-            ax2 = axes[0, 1]
-            top_50 = eigenvalues_sorted[:min(50, len(eigenvalues_sorted))]
-            ax2.bar(range(len(top_50)), top_50, color='coral', alpha=0.8)
-            ax2.set_xlabel('Index', fontsize=11)
-            ax2.set_ylabel('Magnitude', fontsize=11)
-            ax2.set_title(f'Top {len(top_50)} Eigenvalues', fontsize=12, fontweight='bold')
-            ax2.grid(alpha=0.3, axis='y')
-            
-            # Subplot 3: Cumulative energy
-            ax3 = axes[1, 0]
-            total_energy = np.sum(eigenvalues_sorted**2)
-            cumulative_energy = np.cumsum(eigenvalues_sorted**2) / total_energy
-            ax3.plot(cumulative_energy, linewidth=2, color='green')
-            ax3.axhline(y=0.9, color='red', linestyle='--', alpha=0.5, label='90%')
-            ax3.axhline(y=0.95, color='orange', linestyle='--', alpha=0.5, label='95%')
-            ax3.set_xlabel('Number of Eigenvalues', fontsize=11)
-            ax3.set_ylabel('Cumulative Energy', fontsize=11)
-            ax3.set_title('Energy Explained', fontsize=12, fontweight='bold')
-            ax3.legend()
-            ax3.grid(alpha=0.3)
-            
-            # Subplot 4: Eigenvalue ratios
-            ax4 = axes[1, 1]
-            if len(eigenvalues_sorted) > 1:
-                ratios = eigenvalues_sorted[:-1] / eigenvalues_sorted[1:]
-                plot_range = min(100, len(ratios))
-                ax4.plot(ratios[:plot_range], 'o-', color='purple', markersize=3, linewidth=1)
-                ax4.set_xlabel('Index', fontsize=11)
-                ax4.set_ylabel('λ_i / λ_{i+1}', fontsize=11)
-                ax4.set_title('Consecutive Ratios', fontsize=12, fontweight='bold')
-                ax4.grid(alpha=0.3)
-            
-            plt.suptitle(f'Eigenvalue Spectrum: {model_name}\n{dataset_safe} (Layer {best_layer})', 
-                        fontsize=14, fontweight='bold', y=0.995)
-            plt.tight_layout()
+            eigenvalues = plot_operator_eigenvalue_spectrum(
+                best_operator,
+                title=f"Eigenvalue Spectrum: {model_name}\n{dataset_safe} (Layer {best_layer})"
+            )
             
             eigen_plot_path = f"{plots_dir}/{file_prefix}_eigenvalues.png"
             plt.savefig(eigen_plot_path, dpi=150, bbox_inches='tight')
             plt.close()
             
             print(f"Saved eigenvalue plot: {eigen_plot_path}")
+            
+            # Calculate eigenvalue statistics
+            eigenvalues_sorted = np.sort(np.abs(eigenvalues))[::-1]
+            total_energy = np.sum(eigenvalues_sorted**2)
+            cumulative_energy = np.cumsum(eigenvalues_sorted**2) / total_energy
             
             # Return results (can't pickle operators, save parameters)
             return {
@@ -236,7 +201,14 @@ class LREPlotExperimentWorker:
                 },
                 'plots': {
                     'layer_faithfulness': layer_plot_path,
-                    'eigenvalue_spectrum': eigen_plot_path
+                    'eigenvalue_spectrum': eigen_plot_path,
+                    'svd_analysis': svd_plot_path
+                },
+                'singular_value_stats': {
+                    'num_singular_values': len(singular_values),
+                    'largest': float(singular_values[0]),
+                    'smallest': float(singular_values[-1]),
+                    'condition_number': float(singular_values[0] / singular_values[-1])
                 }
             }
             
