@@ -22,16 +22,22 @@ class LREModel:
         # GPT-2/J specific tokenization configs
         self.tokenizer.pad_token = self.tokenizer.eos_token
         
-    def get_hidden_state(self, text, layer_name):
+    def get_hidden_state(self, text, layer_name, token_position="last"):
         """
-        Runs the model and extracts the hidden state at the last token of the prompt.
-        This is where the model is about to predict the answer.
+        Runs the model and extracts the hidden state at a specific token position.
+        
+        Args:
+            text: The input text
+            layer_name: Which layer to extract from
+            token_position: Either "last" (last token of entire prompt) or an integer index
         """
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
         
-        # Extract from the last token of the entire prompt
-        # This is where the model computes the next token prediction
-        last_token_idx = inputs["input_ids"].shape[1] - 1
+        # Determine which token to extract from
+        if token_position == "last":
+            token_idx = inputs["input_ids"].shape[1] - 1
+        else:
+            token_idx = token_position
 
         with TraceDict(self.model, [layer_name]) as ret:
             self.model(**inputs)
@@ -41,15 +47,59 @@ class LREModel:
         output = ret[layer_name].output
         if isinstance(output, tuple):
             # Output is a tuple, extract the first element
-            h = output[0][0, last_token_idx, :].detach().cpu().numpy()
+            h = output[0][0, token_idx, :].detach().cpu().numpy()
         else:
             # Output is already a tensor
-            h = output[0, last_token_idx, :].detach().cpu().numpy()
+            h = output[0, token_idx, :].detach().cpu().numpy()
         return h
+    
+    def find_subject_last_token(self, prompt, subject):
+        """
+        Find the last token position of the subject in the prompt using offset mapping.
+        This avoids tokenization mismatch issues.
+        
+        Args:
+            prompt: The full formatted prompt containing the subject
+            subject: The subject string to find
+            
+        Returns:
+            The token index of the last token of the subject's last occurrence
+        """
+        # Tokenize with offset mapping to get character-level positions
+        inputs = self.tokenizer(prompt, return_tensors="pt", return_offsets_mapping=True)
+        offset_mapping = inputs["offset_mapping"][0]  # Shape: (seq_len, 2)
+        
+        # Find the last occurrence of subject in the prompt
+        subject_start_char = prompt.rfind(subject)
+        if subject_start_char == -1:
+            raise ValueError(f"Subject '{subject}' not found in prompt: '{prompt}'")
+        
+        subject_end_char = subject_start_char + len(subject)
+        
+        # Find which token contains the end of the subject
+        # We want the last token that overlaps with the subject
+        subject_last_token = None
+        for token_idx, (start, end) in enumerate(offset_mapping):
+            # Check if this token overlaps with the subject
+            if start < subject_end_char and end > subject_start_char:
+                subject_last_token = token_idx
+        
+        if subject_last_token is None:
+            raise ValueError(f"Could not find subject '{subject}' in tokenized prompt")
+        
+        return subject_last_token
 
-    def train_lre(self, training_data, layer_name, template):
+    def train_lre(self, training_data, layer_name, template, extract_from="subject_end"):
         """
         Learns the matrix W and bias b such that: W * h_subject + b ≈ h_object_output
+        
+        Args:
+            training_data: List of samples with 'subject' and 'object'
+            layer_name: Layer to extract hidden states from
+            template: Prompt template with {} placeholder
+            extract_from: "subject_end" (default) or "template_end"
+                - "subject_end": Extract from last token of subject (e.g., "water")
+                - "template_end": Extract from last token of full prompt (e.g., "with")
         """
         X = [] # Subject hidden states (inputs)
         Y = [] # Object target outputs (we will approximate the next token logits)
@@ -59,7 +109,14 @@ class LREModel:
             prompt = template.format(subj)
             
             # 1. Get Input State (s) at the specific layer
-            h_s = self.get_hidden_state(prompt, layer_name)
+            if extract_from == "subject_end":
+                # Use offset mapping to find subject's last token position
+                subject_last_token_pos = self.find_subject_last_token(prompt, subj)
+                h_s = self.get_hidden_state(prompt, layer_name, token_position=subject_last_token_pos)
+            else:  # "template_end"
+                # Extract from last token of entire prompt
+                h_s = self.get_hidden_state(prompt, layer_name, token_position="last")
+            
             X.append(h_s)
 
             # 2. Get the "Ideal" direction. 
@@ -81,7 +138,7 @@ class LREModel:
         reg = LinearRegression().fit(X, Y)
         return reg
 
-    def evaluate(self, lre_operator, test_data, layer_name, template, verbose=True):
+    def evaluate(self, lre_operator, test_data, layer_name, template, verbose=True, extract_from="subject_end"):
         correct = 0
         total = 0
         
@@ -108,8 +165,13 @@ class LREModel:
             expected = sample['object']
             prompt = template.format(subj)
 
-            # 1. Get current hidden state
-            h = self.get_hidden_state(prompt, layer_name)
+            # 1. Get current hidden state (matching training extraction point)
+            if extract_from == "subject_end":
+                # Use offset mapping to find subject's last token position
+                subject_last_token_pos = self.find_subject_last_token(prompt, subj)
+                h = self.get_hidden_state(prompt, layer_name, token_position=subject_last_token_pos)
+            else:  # "template_end"
+                h = self.get_hidden_state(prompt, layer_name, token_position="last")
             
             # 2. Apply Linear Transformation (LRE)
             # z_pred = W * h + b
