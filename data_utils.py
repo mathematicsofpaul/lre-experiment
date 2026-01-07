@@ -462,11 +462,11 @@ def run_layer_experiment(lre_model, train_data, test_data, layers_to_test, templ
         import matplotlib.pyplot as plt
         
         fig, ax = plt.subplots(figsize=(10, 6))
-        ax.barh(layer_numbers, faithfulness_values, color='steelblue')
-        ax.set_xlabel('Faithfulness Score (Test Set)')
-        ax.set_ylabel('Layer Number')
+        ax.bar(layer_numbers, faithfulness_values, color='steelblue')
+        ax.set_xlabel('Layer Number')
+        ax.set_ylabel('Faithfulness Score (Test Set)')
         ax.set_title('LRE Faithfulness by Layer (Test Set Performance)')
-        ax.invert_yaxis()
+        ax.grid(alpha=0.3, axis='y')
         plt.tight_layout()
         plt.show()
     
@@ -488,7 +488,7 @@ def run_layer_experiment(lre_model, train_data, test_data, layers_to_test, templ
     }
 
 
-def plot_operator_eigenvalue_spectrum(operator, title="Operator Eigenvalue Spectrum"):
+def plot_operator_eigenvalue_spectrum(operator, title="Operator Eigenvalue Spectrum", xlim=None, ylim=None):
     """
     Plot the eigenvalue spectrum of an operator's coefficient matrix.
     
@@ -498,6 +498,13 @@ def plot_operator_eigenvalue_spectrum(operator, title="Operator Eigenvalue Spect
         The trained linear regression operator
     title : str
         Title for the plot
+    xlim : int or tuple, optional
+        If int: sets x-axis limit for both plots (0 to xlim)
+        If tuple: sets x-axis range as (xmin, xmax)
+        If None: auto-scales based on data
+    ylim : tuple, optional
+        Sets y-axis limits as (ymin, ymax) for both plots
+        If None: auto-scales based on data
         
     Returns:
     --------
@@ -523,6 +530,17 @@ def plot_operator_eigenvalue_spectrum(operator, title="Operator Eigenvalue Spect
     ax1.set_title('All Eigenvalues', fontsize=12, fontweight='bold')
     ax1.grid(alpha=0.3)
     
+    # Apply x-axis limit to first plot if specified
+    if xlim is not None:
+        if isinstance(xlim, int):
+            ax1.set_xlim(0, xlim)
+        else:
+            ax1.set_xlim(xlim)
+    
+    # Apply y-axis limit to first plot if specified
+    if ylim is not None:
+        ax1.set_ylim(ylim)
+    
     # Plot 2: Top 50 eigenvalues
     ax2 = axes[1]
     top_50 = eigenvalues_sorted[:min(50, len(eigenvalues_sorted))]
@@ -532,9 +550,19 @@ def plot_operator_eigenvalue_spectrum(operator, title="Operator Eigenvalue Spect
     ax2.set_title(f'Top {len(top_50)} Eigenvalues', fontsize=12, fontweight='bold')
     ax2.grid(alpha=0.3, axis='y')
     
+    # Apply x-axis limit to second plot if specified
+    if xlim is not None:
+        if isinstance(xlim, int):
+            ax2.set_xlim(-0.5, min(xlim, len(top_50)) - 0.5)
+        else:
+            ax2.set_xlim(xlim)
+    
+    # Apply y-axis limit to second plot if specified
+    if ylim is not None:
+        ax2.set_ylim(ylim)
+    
     plt.suptitle(title, fontsize=14, fontweight='bold', y=1.00)
     plt.tight_layout()
-    plt.show()
     
     # Print statistics
     print(f"\n{'='*60}")
@@ -549,7 +577,7 @@ def plot_operator_eigenvalue_spectrum(operator, title="Operator Eigenvalue Spect
     for i in range(min(10, len(eigenvalues_sorted))):
         print(f"  λ_{i+1}: {eigenvalues_sorted[i]:.6e}")
     
-    return eigenvalues_sorted
+    return fig, eigenvalues_sorted
 
 
 def plot_pca_predictions(test_eval_results, class1_label='men', class2_label='women', title_prefix='PCA', figsize=(16, 14)):
