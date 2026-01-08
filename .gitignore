@@ -10,7 +10,7 @@ wheels/
 .venv
 
 # Large model/result files
-model_*.json
+model_o*.json
 *.json
 
 # But include these specific config files
