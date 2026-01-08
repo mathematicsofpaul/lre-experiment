@@ -1,0 +1,29 @@
+{
+  "models": [
+    "Qwen/Qwen3-0.6B",
+    "Qwen/Qwen3-1.7B",
+    "Qwen/Qwen3-4B",
+    "Qwen/Qwen3-8B"
+  ],
+  "datasets": [
+    "data/bias/characteristic_gender.json",
+    "data/bias/name_gender.json",
+    "data/bias/occupation_gender.json",
+    "data/commonsense/fruit_outside_color.json",
+    "data/commonsense/object_superclass.json",
+    "data/commonsense/word_sentiment.json",
+    "data/factual/country_capital_city.json",
+    "data/factual/country_language.json",
+    "data/factual/person_occupation.json",
+    "data/factual/company_ceo.json",
+    "data/linguistic/adj_antonym.json",
+    "data/linguistic/verb_past_tense.json"
+  ],
+  "layers_config": {
+    "start_offset": 3,
+    "end_offset": 3,
+    "step": 1
+  },
+  "train_ratio": 0.6,
+  "seed": 42
+}
