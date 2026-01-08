@@ -1,7 +1,19 @@
 Dataset,Model,Best Layer,Faithfulness
-occupation_age,Qwen/Qwen3-0.6B,model.layers.9,0.8333333333333334
-occupation_age,Qwen/Qwen3-1.7B,model.layers.22,0.9444444444444444
-degree_gender,Qwen/Qwen3-0.6B,model.layers.7,0.875
-degree_gender,Qwen/Qwen3-1.7B,model.layers.5,0.8125
-characteristic_gender,Qwen/Qwen3-0.6B,model.layers.13,0.75
-characteristic_gender,Qwen/Qwen3-1.7B,model.layers.18,0.8333333333333334
+occupation_age,Qwen/Qwen3-0.6B,model.layers.7,0.725
+occupation_age,Qwen/Qwen3-1.7B,model.layers.4,0.625
+occupation_age,Qwen/Qwen3-4B,model.layers.20,0.575
+occupation_age,meta-llama/Llama-3.2-1B,model.layers.11,0.55
+occupation_age,google/gemma-3-270m,model.layers.10,0.7
+occupation_age,google/gemma-3-1b-pt,model.layers.10,0.775
+degree_gender,Qwen/Qwen3-0.6B,model.layers.18,0.7272727272727273
+degree_gender,Qwen/Qwen3-1.7B,model.layers.9,0.6666666666666666
+degree_gender,Qwen/Qwen3-4B,model.layers.19,0.696969696969697
+degree_gender,meta-llama/Llama-3.2-1B,model.layers.0,0.696969696969697
+degree_gender,google/gemma-3-270m,model.layers.2,0.6060606060606061
+degree_gender,google/gemma-3-1b-pt,model.layers.10,0.6363636363636364
+characteristic_gender,Qwen/Qwen3-0.6B,model.layers.4,0.6
+characteristic_gender,Qwen/Qwen3-1.7B,model.layers.16,0.64
+characteristic_gender,Qwen/Qwen3-4B,model.layers.18,0.64
+characteristic_gender,meta-llama/Llama-3.2-1B,model.layers.2,0.6
+characteristic_gender,google/gemma-3-270m,model.layers.3,0.68
+characteristic_gender,google/gemma-3-1b-pt,model.layers.9,0.68
