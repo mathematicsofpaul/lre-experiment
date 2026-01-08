@@ -9,3 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
+# Large model/result files
+model_*.json
+*.json
+
+# But include these specific config files
+!model_layer_info.json
+!model_config.json
