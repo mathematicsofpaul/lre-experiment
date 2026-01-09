@@ -93,7 +93,7 @@ def create_model_dropdown(default_model="Qwen/Qwen3-0.6B"):
     )
 
 
-def fetch_model_layer_info(models, output_file=None, verbose=True):
+def fetch_model_layer_info(models, output_file=None, verbose=True, token=None):
     """
     Fetch layer count and metadata for a list of models.
     
@@ -101,6 +101,7 @@ def fetch_model_layer_info(models, output_file=None, verbose=True):
         models: List of model names to fetch info for
         output_file: Optional JSON file path to save results
         verbose: Whether to print progress information
+        token: HuggingFace API token for accessing gated models
         
     Returns:
         dict: Dictionary mapping model names to their metadata
@@ -111,7 +112,7 @@ def fetch_model_layer_info(models, output_file=None, verbose=True):
     
     for model_name in models:
         try:
-            config = AutoConfig.from_pretrained(model_name)
+            config = AutoConfig.from_pretrained(model_name, token=token)
             
             # Different models use different attribute names for layer count
             if hasattr(config, 'num_hidden_layers'):
